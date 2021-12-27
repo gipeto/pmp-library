@@ -12,6 +12,9 @@ if(WITH_EXAMPLES)
   add_executable(SurfaceMeshBarycenter SurfaceMeshBarycenter.cpp)
   target_link_libraries(SurfaceMeshBarycenter pmp)
 
+  add_executable(filteredQuadric filteredQuadric.cpp)
+  target_link_libraries(filteredQuadric pmp)
+
   add_custom_target(
     examples
     COMMAND
@@ -19,6 +22,6 @@ if(WITH_EXAMPLES)
     COMMENT "")
 
   add_dependencies(examples SurfaceMeshBasics SurfaceMeshIO
-                   SurfaceMeshIterators SurfaceMeshBarycenter)
+                   SurfaceMeshIterators SurfaceMeshBarycenter filteredQuadric)
 
 endif(WITH_EXAMPLES)

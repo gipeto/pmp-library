@@ -68,6 +68,10 @@ endif(PMP_BUILD_VIS)
 set(EIGEN_SOURCE_DIR "external/eigen")
 include_directories(${EIGEN_SOURCE_DIR})
 
+# setup Nanoflann
+set(NANOFLANN_SOURCE_DIR "external/nanoflann/include")
+include_directories(${NANOFLANN_SOURCE_DIR})
+
 # setup PLY
 set(RPLY_SOURCE_DIR "external/rply")
 include_directories(${RPLY_SOURCE_DIR})
