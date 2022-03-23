@@ -177,20 +177,64 @@ std::vector<double> vertexAreas(const SurfaceMesh& mesh)
     return vertexAreas;
 }
 
-std::vector<Quadric> computeInitialQuadrics(SurfaceMesh& mesh)
+std::tuple<std::vector<Normal>, std::vector<Point>> smoothedNormalsAndCenters(
+    float scale, const SurfaceMesh& mesh)
+{
+    std::vector<Normal> normals(mesh.n_faces());
+    std::vector<Point> baryCenters(mesh.n_faces());
+    for (auto face : mesh.faces())
+    {
+        normals[face.idx()] = SurfaceNormals::compute_face_normal(mesh, face);
+        baryCenters[face.idx()] = pmp::centroid(mesh, face);
+    }
+
+    std::vector<Normal> fNormals(normals);
+    PointCloudAdaptor pcl(baryCenters);
+
+    KDTree_t tree(3, pcl,
+                  nanoflann::KDTreeSingleIndexAdaptorParams(10));
+    tree.buildIndex();
+
+    const auto gScale = 1.f / (2.f * scale * scale);
+
+    for (auto face : mesh.faces())
+    {
+        std::vector<std::pair<unsigned int, Scalar>> neighborsScores;
+        tree.radiusSearch(&baryCenters[face.idx()](0, 0), scale,
+                          neighborsScores, nanoflann::SearchParams{});
+
+        float w{0.f};
+        for (const auto& ns : neighborsScores)
+        {
+            const auto score = exp(-ns.second * gScale);
+            w += score;
+            fNormals[face.idx()] += normals[ns.first] * score;
+        }
+
+        fNormals[face.idx()] /= w;
+    }
+
+    return {std::move(fNormals), std::move(baryCenters)};
+}
+
+std::vector<Quadric> computeInitialQuadrics(float normalsScale,
+                                            const SurfaceMesh& mesh)
 {
     std::vector<Quadric> quadrics(mesh.n_vertices());
     constexpr auto scale = 1. / 3.;
 
+    std::cout << "-> Smooth normals" << std::endl;
+    auto [normals, centers] = smoothedNormalsAndCenters(normalsScale, mesh);
+
+    std::cout << "-> Compute quadrics" << std::endl;
+
     // compute quadrics per vertex
     for (auto vit : mesh.vertices())
     {
-        quadrics[vit.idx()].clear();
         for (auto face : mesh.faces(vit))
         {
             quadrics[vit.idx()] +=
-                Quadric(SurfaceNormals::compute_face_normal(mesh, face),
-                        pmp::centroid(mesh, face));
+                Quadric(normals[face.idx()], centers[face.idx()]);
             // quadrics[vit.idx()] *= pmp::triangle_area(mesh, face);
         }
         quadrics[vit.idx()] *= scale;
@@ -316,8 +360,6 @@ int main(int argc, char** argv)
         sigmab = static_cast<Scalar>(std::atof(argv[5]));
     }
 
-   
-
     std::cout << "Sigma_b: " << sigmab << std::endl;
     std::cout << "Sigma_s: " << sigmas << std::endl;
     std::cout << "Sigma_r: " << sigmar << std::endl;
@@ -328,7 +370,7 @@ int main(int argc, char** argv)
     const auto areas = vertexAreas(mesh);
 
     std::cout << "Compute initial quadrics" << std::endl;
-    auto quadrics = computeInitialQuadrics(mesh);
+    auto quadrics = computeInitialQuadrics(sigmas / 4.f, mesh);
 
     std::cout << "Build kd-tree" << std::endl;
     PointCloudAdaptor pcl(mesh.positions());

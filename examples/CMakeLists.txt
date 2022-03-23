@@ -14,6 +14,7 @@ if(WITH_EXAMPLES)
 
   add_executable(filteredQuadric filteredQuadric.cpp)
   target_link_libraries(filteredQuadric pmp)
+  target_compile_features(filteredQuadric PUBLIC cxx_std_17)
 
   add_custom_target(
     examples
